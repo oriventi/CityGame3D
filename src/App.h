@@ -14,6 +14,11 @@ const char* const WIN_TITLE = "Vulkan";
 
 struct QueueFamilyIndices {
     std::optional<uint32_t> graphicsFamily;
+    std::optional<uint32_t> presentFamily;
+
+    [[nodiscard]] bool isComplete() const {
+        return graphicsFamily.has_value() && presentFamily.has_value();
+    }
 };
 
 class App {
@@ -36,13 +41,15 @@ private:
 
     void createLogicalDevice();
 
-    static QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice& device);
+    void createSurface();
+
+    QueueFamilyIndices findQueueFamilies(const vk::PhysicalDevice& device);
 
     void mainLoop();
 
     void cleanUp();
 
-    static uint32_t rateDevice(vk::PhysicalDevice device);
+    uint32_t rateDevice(vk::PhysicalDevice device);
 
 private:
     vk::Instance instance;
@@ -50,6 +57,9 @@ private:
     vk::Device device;
 
     vk::Queue graphicsQueue;
+    vk::Queue presentQueue;
+
+    vk::SurfaceKHR surface;
 
     app::Window window{WIN_WIDTH, WIN_HEIGHT, WIN_TITLE};
 };

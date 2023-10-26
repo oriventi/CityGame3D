@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include<map>
+#include<set>
 
 void App::run() {
     initVulkan();
@@ -13,6 +14,7 @@ void App::run() {
 
 void App::initVulkan() {
     createInstance();
+    createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
 }
@@ -86,7 +88,7 @@ uint32_t App::rateDevice(vk::PhysicalDevice device) {
 
     QueueFamilyIndices indices = findQueueFamilies(device);
 
-    if(!indices.graphicsFamily.has_value())
+    if(!indices.isComplete())
     {
         std::cout << "No graphics queue family found!" << std::endl;
         return 0;
@@ -95,20 +97,33 @@ uint32_t App::rateDevice(vk::PhysicalDevice device) {
     return score;
 }
 
+void App::createSurface() {
+
+    if(glfwCreateWindowSurface(instance, window.getWindow(), nullptr, surface) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create window surface!");
+    }
+
+}
+
 void App::createLogicalDevice() {
     QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-    vk::DeviceQueueCreateInfo queueCreateInfo{};
-    //queueCreateInfo.sType = vk::StructureType::eDeviceQueueCreateInfo;
-    queueCreateInfo.queueFamilyIndex = indices.graphicsFamily.value();
-    queueCreateInfo.queueCount = 1;
+    std::vector<vk::DeviceQueueCreateInfo> queueCreateInfos{};
+    std::set<uint32_t> uniqueQueueFamilies = {indices.graphicsFamily.value(), indices.presentFamily.value()};
+
     float queuePriority = 1.0f;
-    queueCreateInfo.pQueuePriorities = &queuePriority;
+    for (uint32_t queueFamilty : uniqueQueueFamilies) {
+        vk::DeviceQueueCreateInfo queueCreateInfo{};
+        queueCreateInfo.queueFamilyIndex = queueFamilty;
+        queueCreateInfo.queueCount = 1;
+        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfos.push_back(queueCreateInfo);
+    }
 
     vk::PhysicalDeviceFeatures deviceFeatures{};
 
     vk::DeviceCreateInfo createInfo{};
-    createInfo.pQueueCreateInfos = &queueCreateInfo;
-    createInfo.queueCreateInfoCount = 1;
+    createInfo.pQueueCreateInfos = queueCreateInfos.data();
+    createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
     createInfo.pEnabledFeatures = &deviceFeatures;
     createInfo.enabledExtensionCount = 0;
 
@@ -120,6 +135,7 @@ void App::createLogicalDevice() {
     }
 
     device.getQueue(indices.graphicsFamily.value(), 0, &graphicsQueue);
+    device.getQueue(indices.presentFamily.value(), 0, &presentQueue);
 
 }
 
@@ -157,9 +173,9 @@ void App::mainLoop() {
 }
 
 void App::cleanUp() {
+    vkDestroySurfaceKHR(instance, surface, nullptr);
     device.destroy();
     instance.destroy();
-
 }
 
 void App::checkExtensionsSupport(const char **glfwExtensions, uint32_t glfwExtensionCount,
@@ -192,6 +208,19 @@ QueueFamilyIndices App::findQueueFamilies(vk::PhysicalDevice const &device) {
         if(queueFamilyProperties[i].queueFlags & vk::QueueFlagBits::eGraphics)
         {
             indices.graphicsFamily = i;
+        }
+
+        VkBool32 presentSupport = false;
+        if(device.getSurfaceSupportKHR(i, surface, &presentSupport) != vk::Result::eSuccess){
+            throw std::runtime_error("failed to get present extension");
+        };
+
+        if(presentSupport) {
+            indices.presentFamily = i;
+        }
+
+        if(indices.isComplete()) {
+            break;
         }
     }
 

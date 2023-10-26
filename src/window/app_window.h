@@ -12,6 +12,10 @@ namespace app {
 
         [[nodiscard]] inline bool shouldClose() const {return glfwWindowShouldClose(window); }
 
+        [[nodiscard]] inline GLFWwindow* getWindow() const {
+            return window;
+        }
+
     private:
 
         void initWindow();
